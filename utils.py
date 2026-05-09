@@ -73,6 +73,8 @@ class FabricDataset(Dataset):
         mask = self.masks[idx]
         if mask is not None:
             mask = cv2.imread(self.masks[idx], cv2.IMREAD_GRAYSCALE)
+        else:
+            mask = torch.zeros((1, img.shape[1], img.shape[2]))
 
         return img, label, mask
 
