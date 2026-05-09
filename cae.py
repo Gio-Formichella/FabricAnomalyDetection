@@ -1,5 +1,9 @@
 import torch
 import torch.nn as nn
+from torch.optim import AdamW
+import os
+import json
+from tqdm import tqdm
 
 
 class EncoderBlock(nn.Module):
@@ -133,3 +137,84 @@ class ConvolutionalAutoEncoder(nn.Module):
         x = torch.sigmoid(x)
 
         return x
+
+
+def train_cae(
+    cae_model,
+    train_dataloader,
+    val_dataloader,
+    num_epochs,
+    lr,
+    selected_loss,
+    device,
+    run_id,
+):
+    results_dir = os.path.join("./results", run_id)
+    os.makedirs(results_dir, exist_ok=True)
+    history_path = os.path.join(
+        results_dir, "history.json"
+    )  # Stores training/validation metrics
+    weights_path = os.path.join(
+        results_dir, "cae.pt"
+    )  # Stores lowest validation loss weights
+
+    train_history = []
+    val_history = []
+
+    optimizer = AdamW(cae_model.parameters(), lr=lr)
+
+    if selected_loss == "MSE":
+        criterion = nn.MSELoss()
+    elif selected_loss == "SSIM":
+        criterion = ""  # TODO
+
+    step = 0  # optimization step count
+    best_val_loss = float("inf")
+    
+    cae_model.to(device)
+
+    for _ in tqdm(range(num_epochs)):
+        # Training
+        cae_model.train()
+        for images, _, _ in train_dataloader:
+            step += 1
+            images = images.to(device)
+
+            reconstructions = cae_model(images)
+            loss = criterion(images, reconstructions)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            train_history.append(
+                {
+                    "step": step,
+                    "train_loss": loss.item(),
+                }
+            )
+
+        # Validation
+        cae_model.eval()
+        val_epoch_loss = 0
+        with torch.no_grad():
+            for images, _, _ in val_dataloader:
+                images = images.to(device)
+
+                reconstructions = cae_model(images)
+                loss = criterion(images, reconstructions)
+
+                val_epoch_loss += loss
+
+        if val_epoch_loss < best_val_loss:
+            best_val_loss = val_epoch_loss
+            torch.save(cae_model.state_dict(), weights_path)
+
+        val_history.append(
+            {"step": step, "val_loss": val_epoch_loss.item() / len(val_dataloader)}
+        )
+
+        # Storing metrics after every epoch in case of run interruption
+        history = {"train": train_history, "val": val_history}
+        with open(history_path, "w") as f:
+            json.dump(history, f, indent=4)
