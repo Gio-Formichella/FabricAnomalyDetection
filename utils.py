@@ -2,8 +2,11 @@ import numpy as np
 import torch
 import random
 from torch.utils.data import Dataset
-import os
-import cv2
+from pathlib import Path
+
+from PIL import Image
+from torchvision.transforms import InterpolationMode
+from torchvision.transforms.functional import resize, to_tensor
 
 
 def fix_random(seed: int) -> None:
@@ -22,49 +25,33 @@ def fix_random(seed: int) -> None:
 
 
 class FabricDataset(Dataset):
-    def __init__(self, dataset_path, split, transforms=None):
-        self.dataset_path = dataset_path
-        self.split = split
+    SPLITS = {"train": "train", "val": "validation", "test": "test_public"}
+
+    def __init__(self, split, transforms=to_tensor, root="data/fabric"):
+        split_folder = self.SPLITS[split]
         self.transforms = transforms
+        self.images = []
+        self.labels = []
+        self.masks = []
 
-        self.images = []  # Paths to images
-        self.labels = []  # 0 for good and 1 bad (i.e. anomaly)
-        self.masks = []  # Paths to ground truth masks
+        split_path = Path(root) / split_folder
+        self._add_images(split_path / "good", 0)
+        if split == "test":
+            self._add_images(split_path / "bad", 1)
 
-        if self.split in ("train", "val"):
-            folder_name = "train" if self.split == "train" else "validation"
-            split_folder = os.path.join(self.dataset_path, folder_name, "good")
-            for img_id in os.listdir(split_folder):
-                self.images.append(os.path.join(split_folder, img_id))
-                # Training and validation images have no anomalies
-                self.labels.append(0)
-                self.masks.append(None)
+    def _add_images(self, folder, label):
+        image_paths = sorted(folder.glob("*.png"))
+        if not image_paths:
+            raise FileNotFoundError(f"No png images found in {folder}")
 
-        elif self.split == "test":
-            split_folder = os.path.join(self.dataset_path, "test_public")
-
-            good_folder = os.path.join(
-                split_folder, "good"
-            )  # Test data with no anomalies
-            for img_id in os.listdir(good_folder):
-                self.images.append(os.path.join(good_folder, img_id))
-                self.labels.append(0)
-                self.masks.append(None)
-
-            bad_folder = os.path.join(split_folder, "bad")  # Test data with anomalies
-            for img_id in os.listdir(bad_folder):
-                self.images.append(os.path.join(bad_folder, img_id))
-                self.labels.append(1)
-
-                mask_id = img_id[:-4] + "_mask.png"
-                self.masks.append(
-                    os.path.join(split_folder, "ground_truth", "bad", mask_id)
-                )
-        else:
-            raise ValueError("Split must be either train, val or test")
+        for image_path in image_paths:
+            self.images.append(image_path)
+            self.labels.append(label)
+            mask = folder.parent / "ground_truth" / "bad" / f"{image_path.stem}_mask.png"
+            self.masks.append(mask if label else None)
 
     def __getitem__(self, idx):
-        img = cv2.imread(self.images[idx], cv2.IMREAD_COLOR_RGB)
+        img = Image.open(self.images[idx]).convert("RGB")
         if self.transforms is not None:
             img = self.transforms(img)
 
@@ -72,9 +59,16 @@ class FabricDataset(Dataset):
 
         mask = self.masks[idx]
         if mask is not None:
-            mask = cv2.imread(self.masks[idx], cv2.IMREAD_GRAYSCALE)
+            mask = Image.open(mask).convert("L")
+            mask = to_tensor(mask)
+            if isinstance(img, torch.Tensor):
+                mask = resize(mask, img.shape[1:], InterpolationMode.NEAREST)
         else:
-            mask = torch.zeros((1, img.shape[1], img.shape[2]))
+            if isinstance(img, torch.Tensor):
+                height, width = img.shape[1], img.shape[2]
+            else:
+                width, height = img.size
+            mask = torch.zeros((1, height, width))
 
         return img, label, mask
 
