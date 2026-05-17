@@ -14,4 +14,6 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
+    "pytorch-msssim>=1.0.0",
+    "tqdm>=4.67.3",
 ]
