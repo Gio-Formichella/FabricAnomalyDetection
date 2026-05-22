@@ -1,5 +1,7 @@
 import copy
+import json
 import os
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -8,8 +10,10 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
 from torchvision.transforms import functional as TF
+from tqdm import tqdm
 
-from utils import FabricDataset, fix_random
+from utils import FabricDataset, fix_random, plot_loss
+from PIL import Image
 
 
 data_root = "data/fabric"
@@ -88,19 +92,58 @@ class FeatureVAE(nn.Module):
 
 
 
-def cache_images(split, transform, root):
+def cache_images(split, root, device="cuda", chunk_size=32):
     """
-    Returns a tensor of images and a tensor of labels
+    Returns a tensor of images, a tensor of labels, and a tensor of masks.
+    Uses GPU-accelerated batch transforms for faster preprocessing.
     """
-    dataset = FabricDataset(split, transforms=transform, root=root)
-    images, labels = [], []
-    for image, label, _ in dataset:
-        images.append(image)
-        labels.append(label)
-    return torch.stack(images), torch.tensor(labels)
+    dataset = FabricDataset(split, root=root)
+    n = len(dataset)
+    all_images, all_masks, labels = [], [], []
+    chunk = []
+
+    for idx in tqdm(range(n), desc=f"Cache {split}"):
+        img = Image.open(dataset.images[idx]).convert("RGB")
+        chunk.append(transforms.functional.to_tensor(img))
+        labels.append(dataset.labels[idx])
+
+        mask_path = dataset.masks[idx]
+        if mask_path is not None:
+            mask_pil = Image.open(mask_path).convert("L")
+            w, h = mask_pil.size
+            mask_pil = TF.center_crop(
+                mask_pil, [int(h * crop_fraction), int(w * crop_fraction)]
+            )
+            mask_pil = mask_pil.resize((image_size, image_size), Image.NEAREST)
+            all_masks.append(transforms.functional.to_tensor(mask_pil))
+        else:
+            all_masks.append(torch.zeros(1, image_size, image_size))
+
+        # Flush chunk to GPU when full (avoids holding all full-res images in RAM)
+        if len(chunk) == chunk_size:
+            batch = torch.stack(chunk).to(device)
+            _, _, h, w = batch.shape
+            batch = TF.center_crop(
+                batch, [int(h * crop_fraction), int(w * crop_fraction)]
+            )
+            batch = TF.resize(batch, [image_size, image_size])
+            all_images.append(batch.cpu())
+            chunk = []
+
+    if chunk:
+        batch = torch.stack(chunk).to(device)
+        _, _, h, w = batch.shape
+        batch = TF.center_crop(
+            batch, [int(h * crop_fraction), int(w * crop_fraction)]
+        )
+        batch = TF.resize(batch, [image_size, image_size])
+        all_images.append(batch.cpu())
+
+    return torch.cat(all_images), torch.tensor(labels), torch.stack(all_masks)
 
 
-def patch_features(images, patch_size):
+def patch_features(images, patch_size, device="cuda"):
+    images = images.to(device)
     # Split images into a grid of non-overlapping patches
     patches = images.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
     # from [Batch, Channels, GridHeight, GridWidth, PatchHeight, PatchWidth] to [Batch, GridHeight, GridWidth, Channels, PatchHeight, PatchWidth]
@@ -127,7 +170,7 @@ def patch_features(images, patch_size):
         [gray.flatten(1), dx.flatten(1), dy.flatten(1), fft.flatten(1)],
         dim=1,
     )
-    return features, n_images, grid_h * grid_w
+    return features.cpu(), n_images, grid_h * grid_w
 
 
 def standardize(train, *others):
@@ -164,16 +207,26 @@ def reconstruction_loss(model, loader, device):
     return total / len(loader.dataset) / feature_dim
 
 
-def train(model, train_loader, val_loader, optimizer, device, epochs, beta, noise_std):
+def train(model, train_loader, val_loader, optimizer, device, epochs, beta, noise_std, run_id):
     """
     Trains the Denoising VAE. Saves the best model based on validation reconstruction error.
     """
+    results_dir = os.path.join("results", run_id)
+    os.makedirs(results_dir, exist_ok=True)
+    history_path = os.path.join(results_dir, "history.json")
+    weights_path = os.path.join(results_dir, "vae.pt")
+
+    train_history = []
+    val_history = []
+    step = 0
+
     best_val = float("inf")
     best_state = None
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), desc="Training VAE"):
         model.train()
         total_loss = total_recon = total_kld = 0.0
         for (features,) in train_loader:
+            step += 1
             x = features.to(device, non_blocking=True)
             noisy_x = x + noise_std * torch.randn_like(x)
             x_hat, mu, logvar = model(noisy_x)
@@ -187,10 +240,19 @@ def train(model, train_loader, val_loader, optimizer, device, epochs, beta, nois
             total_recon += recon.item() * n
             total_kld += kld.item() * n
 
+            train_history.append({"step": step, "train_loss": loss.item()})
+
         val_recon = reconstruction_loss(model, val_loader, device)
         if val_recon < best_val:
             best_val = val_recon
             best_state = copy.deepcopy(model.state_dict())
+            torch.save(best_state, weights_path)
+        val_history.append({"step": step, "val_loss": val_recon})
+
+        history = {"train": train_history, "val": val_history}
+        with open(history_path, "w") as f:
+            json.dump(history, f, indent=4)
+
         count = len(train_loader.dataset)
         print(
             f"Epoch {epoch + 1}/{epochs} "
@@ -240,20 +302,13 @@ def main():
         raise ValueError("image_size must be divisible by patch_size")
 
     device = "cuda"
-    transform = transforms.Compose(
-        [
-            CenterCropFraction(crop_fraction),
-            transforms.Resize((image_size, image_size)),
-            transforms.ToTensor(),
-        ]
-    )
-    train_images, _ = cache_images("train", transform, data_root)
-    val_images, _ = cache_images("val", transform, data_root)
-    test_images, test_labels = cache_images("test", transform, data_root)
+    train_images, _, _ = cache_images("train", data_root, device)
+    val_images, _, _ = cache_images("val", data_root, device)
+    test_images, test_labels, test_masks = cache_images("test", data_root, device)
 
-    train_features, n_train, train_ppi = patch_features(train_images, patch_size)
-    val_features, _, _ = patch_features(val_images, patch_size)
-    test_features, n_test, test_ppi = patch_features(test_images, patch_size)
+    train_features, n_train, train_ppi = patch_features(train_images, patch_size, device)
+    val_features, _, _ = patch_features(val_images, patch_size, device)
+    test_features, n_test, test_ppi = patch_features(test_images, patch_size, device)
     train_features, (val_features, test_features) = standardize(
         train_features, val_features, test_features
     )
@@ -279,6 +334,7 @@ def main():
         f"features={train_features.shape[1]} train_patches={len(train_features)}",
         flush=True,
     )
+    run_id = f"vae_latent{latent_dim}_beta{beta}"
     train(
         model,
         train_loader,
@@ -288,7 +344,9 @@ def main():
         epochs,
         beta,
         noise_std,
+        run_id,
     )
+    plot_loss(run_id)
     train_errors = patch_errors(model, train_features, n_train, train_ppi, device)
     normalizer = train_errors.mean(dim=0, keepdim=True).clamp_min(1e-6)
 
