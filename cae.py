@@ -8,18 +8,8 @@ from pytorch_msssim import SSIM
 import os
 import json
 from tqdm import tqdm
-
+import argparse
 from utils import FabricDataset, fix_random, plot_loss, plot_anomaly_results
-
-data_root = "data/fabric"
-patch_size = 256
-n_blocks = 5
-selected_loss = "SSIM+MSE"
-learning_rate = 1e-3
-epochs = 50
-batch_size = 32
-seed = 42
-weights_path = "results/cae.pt"
 
 
 class EncoderBlock(nn.Module):
@@ -124,6 +114,7 @@ def train_cae(
     criterion,
     device,
     run_id,
+    technique,
 ):
     results_dir = os.path.join("./results", run_id)
     os.makedirs(results_dir, exist_ok=True)
@@ -172,9 +163,10 @@ def train_cae(
             for images, _, _ in val_dataloader:
                 images = images.to(device)
 
-                reconstructions = sliding_window_inference(
-                    cae_model, images, patch_size
-                )
+                if technique == "sliding_window":
+                    reconstructions = sliding_window_inference(cae_model, images, 256)
+                else:
+                    reconstructions = cae_model(images)
                 loss = criterion(images, reconstructions)
 
                 val_epoch_loss += loss.item()
@@ -215,7 +207,7 @@ def sliding_window_inference(model, image, patch_size=256, stride=128):
     return reconstruction
 
 
-def evaluate(model, dataloader, device, patch_size):
+def evaluate(model, dataloader, device, patch_size, technique):
     model.eval()
     scores = []
     labels = []
@@ -226,7 +218,10 @@ def evaluate(model, dataloader, device, patch_size):
     with torch.no_grad():
         for images, label, _ in dataloader:
             images = images.to(device)
-            recon = sliding_window_inference(model, images, patch_size)
+            if technique == "sliding_window":
+                recon = sliding_window_inference(model, images, patch_size)
+            else:
+                recon = model(images)
 
             # Compute element-wise squared error shape: (B, C, H, W)
             error_map = mse_elementwise(images, recon)
@@ -253,29 +248,58 @@ def evaluate(model, dataloader, device, patch_size):
     return scores, labels
 
 
-def main():
+def run_cae_experiment(data_root, selected_loss, technique, seed, epochs):
     fix_random(seed)
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required.")
     device = "cuda"
 
-    resize_res = (2048, 2304)
-
-    transforms = {
-        "train": v2.Compose(
-            [
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                v2.Resize(resize_res),
-                v2.RandomCrop(patch_size),
-                v2.RandomHorizontalFlip(),
-                v2.RandomVerticalFlip(),
-            ]
-        ),
-        "test": v2.Compose(
-            [v2.ToImage(), v2.ToDtype(torch.float32, scale=True), v2.Resize(resize_res)]
-        ),
-    }
+    if technique == "sliding_window":
+        resize_res = (
+            2048,
+            2304,
+        )  # small resize for simpler 256x256 sliding window logic
+        test_batch = 1  # using one image, each image will produce 8x9 patches
+        transforms = {
+            "train": v2.Compose(
+                [
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Resize(resize_res),
+                    v2.RandomCrop(256),
+                    v2.RandomHorizontalFlip(),
+                    v2.RandomVerticalFlip(),
+                ]
+            ),
+            "test": v2.Compose(
+                [
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Resize(resize_res),
+                ]
+            ),
+        }
+    elif technique == "resize":
+        resize_res = (256, 256)
+        test_batch = 32
+        transforms = {
+            "train": v2.Compose(
+                [
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Resize(resize_res),
+                    v2.RandomHorizontalFlip(),
+                    v2.RandomVerticalFlip(),
+                ]
+            ),
+            "test": v2.Compose(
+                [
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Resize(resize_res),
+                ]
+            ),
+        }
 
     train_set = FabricDataset(
         root=data_root,
@@ -300,36 +324,32 @@ def main():
 
     train_loader = DataLoader(
         dataset=train_set,
-        batch_size=batch_size,
+        batch_size=32,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
         drop_last=True,
-    )  # Images 256 x 256
+    )
 
     val_loader = DataLoader(
         dataset=val_set,
-        batch_size=1,
+        batch_size=test_batch,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-    )  # Images 2304 x 2048
+    )
 
     test_loader = DataLoader(
         dataset=test_set,
-        batch_size=1,
+        batch_size=test_batch,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-    )  # Images 2304 x 2048
-
-    model = ConvolutionalAutoEncoder(n_blocks).to(device)
-    print(
-        f"CUDA: {torch.cuda.get_device_name(0)} | "
-        f"train={len(train_set)} val={len(val_set)} test={len(test_set)}",
-        flush=True,
     )
-    run_id = f"sliding_window_cae_{selected_loss}-loss"
+
+    n_blocks = 5
+    model = ConvolutionalAutoEncoder(n_blocks).to(device)
+    run_id = technique + "_cae_" + selected_loss + "-loss"
     if selected_loss == "MSE":
         criterion = nn.MSELoss()
     elif selected_loss == "SSIM+MSE":
@@ -337,6 +357,8 @@ def main():
         criterion = lambda x, y: 0.5 * nn.MSELoss()(x, y) + 0.5 * (
             1 - ssim_module(x, y)
         )
+
+    learning_rate = 1e-3
 
     if not os.path.exists(
         os.path.join("./results", run_id, "cae.pt")
@@ -350,6 +372,7 @@ def main():
             criterion,
             device,
             run_id,
+            technique,
         )
     plot_loss(run_id)
 
@@ -358,7 +381,7 @@ def main():
     model.load_state_dict(torch.load(best_weights, map_location=device))
     model.to(device)
 
-    test_scores, test_labels = evaluate(model, test_loader, device, patch_size)
+    test_scores, test_labels = evaluate(model, test_loader, device, 256, technique)
     print(
         f"Held-out test Image-Level AUROC: {roc_auc_score(test_labels, test_scores):.4f} "
         f"PR-AUC: {average_precision_score(test_labels, test_scores):.4f}",
@@ -374,7 +397,10 @@ def main():
         image_batch = image.unsqueeze(0).to(device)
 
         # Get reconstruction
-        reconstruction_batch = sliding_window_inference(model, image_batch, patch_size)
+        if technique == "sliding_window":
+            reconstruction_batch = sliding_window_inference(model, image_batch)
+        elif technique == "resize":
+            reconstruction_batch = model(image_batch)
 
         # Compute element-wise MSE for anomaly map
         mse_elementwise = torch.nn.MSELoss(reduction="none")
@@ -393,5 +419,21 @@ def main():
         )
 
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data_root",
+        type=str,
+        help="Path to dataset",
+    )
+    parser.add_argument("--selected_loss", type=str, choices=["MSE", "MSE+SSIM"])
+    parser.add_argument("--technique", type=str, choices=["resize", "sliding_window"])
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--epochs", type=int, default=50)
+
+
 if __name__ == "__main__":
-    main()
+    args = get_args()
+    run_cae_experiment(
+        args.data_root, args.selected_loss, args.technique, args.seed, args.epochs
+    )
