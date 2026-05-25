@@ -6,3 +6,5 @@ Tecniche:
 - Architettura: Convolutional Autoencoders (CAE) e/o Variational Autoencoders (VAE).
 - Training: Addestramento effettuato esclusivamente su immagini defect-free.
 - Anomaly Scoring: Calcolo dell'errore di ricostruzione (es. tramite MSE o SSIM) per la generazione delle anomaly maps.
+
+CAE [weights](https://liveunibo-my.sharepoint.com/:f:/g/personal/gio_formichella_studio_unibo_it/IgBBzT6lCy6bQqKqJaQpCXuVAVcaWroaAQbdVmzBgoJi8Nc?e=yyKXQQ)
