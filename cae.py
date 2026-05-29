@@ -430,6 +430,9 @@ def get_args():
     parser.add_argument("--technique", type=str, choices=["resize", "sliding_window"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--epochs", type=int, default=50)
+    
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == "__main__":
