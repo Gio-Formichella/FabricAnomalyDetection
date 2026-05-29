@@ -3,7 +3,8 @@
 \usetheme{Madrid}
 
 \title{Fabric Anomaly Detection}
-\author{Jacopo Dardini \\ Gio Formichella}
+\author{Jacopo Dardini \\ 
+Gio Formichella}
 \date{}
 
 \usepackage{biblatex}
@@ -20,7 +21,7 @@
         \begin{column}{0.5\textwidth}
             \begin{itemize}
                 \item Fabric anomaly detection
-                \item Goal: automate detection of mistakes in the production of cloth and textile material.
+                \item \textbf{Goal}: automate detection of mistakes in the production of cloth and textile material.
             \end{itemize}
             \begin{figure}
                 \centering
@@ -103,17 +104,34 @@
 
 \begin{frame}{High resolution challenge}
     \begin{itemize}
-        \item Images have a high resolution (2448 x 2048) causing VRAM usage to exceed our GPU limits and crash. Agressive striding would result in dead filters~\cite{ZFNet}, so we tried two approaches: \begin{enumerate}
+        \item Images have a high resolution ($2448 \times 2048$), causing VRAM usage to exceed our GPU limits. Aggressive striding would result in dead filters~\cite{ZFNet}, so we tried two different approaches: \begin{enumerate}
+            \only<1, 3>{
             \item \textbf{Resizing} to 256 x 256: \begin{itemize}
                 \item We verified that anomalies are not washed away by downsampling.
-                \item Pros: allow for inference in a single forward pass.
-                \item Cons: anomalies are made even smaller, making them more challenging.
+                \item \textit{Pros}: Allow for inference in a single forward pass.
+                \item \textit{Cons}: Anomalies are made even smaller, making them more challenging.
             \end{itemize}
+            }
+            \only<2>{
+            \setcounter{enumi}{1}
+            \item Applying the autoencoder as a $256 \times 256$ \textbf{sliding window}:\begin{itemize}
+                \item \textit{Pros}: Does not require downsampling.
+                \item \textit{Cons}: Requires multiple forward passes for each image.
+                \item With a window stride of 256 (each pixel processed once) we got a checkerboard effect.
+                \begin{figure}
+                    \centering
+                    \includegraphics[width=0.3\textwidth]{imgs/checkerboard.png}
+                \end{figure}
+                \item Pixels at the border of the window are not reconstructed correctly, increasing the anomaly score and the false positive rate. 
+            \end{itemize}
+            }
+            \only<3>{
             \item Applying the autoencoder as a 256 x 256 \textbf{sliding window}:\begin{itemize}
-                \item Pros: does not require downsampling.
-                \item Cons: requires multiple forward passes for each image.
-                \item With a window stride of 256 (each pixel processed once) we got a checker board effect: (TODO: inserire immagine)
+                \item \textit{Pros}: does not require downsampling.
+                \item \textit{Cons}: requires multiple forward passes for each image.
+                \item We reduce the window stride to 128 and average the overlapping pixel predictions.
             \end{itemize}
+            }
         \end{enumerate}
     \end{itemize}
 \end{frame}
