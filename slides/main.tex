@@ -108,7 +108,7 @@ Gio Formichella}
             \only<1, 3>{
             \item \textbf{Resizing} to 256 x 256: \begin{itemize}
                 \item We verified that anomalies are not washed away by downsampling.
-                \item \textit{Pros}: Allow for inference in a single forward pass.
+                \item \textit{Pros}: Allows for inference in a single forward pass.
                 \item \textit{Cons}: Anomalies are made even smaller, making them more challenging.
             \end{itemize}
             }
@@ -122,14 +122,15 @@ Gio Formichella}
                     \centering
                     \includegraphics[width=0.3\textwidth]{imgs/checkerboard.png}
                 \end{figure}
-                \item Pixels at the border of the window are not reconstructed correctly, increasing the anomaly score and the false positive rate. 
+                \item Pixels at the borders of the window are not reconstructed correctly, increasing the anomaly score and the false positive rate. 
             \end{itemize}
             }
             \only<3>{
             \item Applying the autoencoder as a 256 x 256 \textbf{sliding window}:\begin{itemize}
-                \item \textit{Pros}: does not require downsampling.
-                \item \textit{Cons}: requires multiple forward passes for each image.
+                \item \textit{Pros}: Does not require downsampling.
+                \item \textit{Cons}: Requires multiple forward passes for each image.
                 \item We reduce the window stride to 128 and average the overlapping pixel predictions.
+                \item We also make the implicit assumption that anomaly detection requires only local information (i.e., information within the window).
             \end{itemize}
             }
         \end{enumerate}
@@ -141,7 +142,60 @@ Gio Formichella}
 \end{frame}
 
 \begin{frame}{CAE}
+    \begin{itemize}
+        \item Architecture:
+            \begin{itemize}
+                \item Stem: $3 \times 3$ convolution mapping the input to 16 channels.
+                \item Encoder: 5 convolutional blocks; each doubles the channel depth and halves the spatial resolution.
+                \item \textbf{Bottleneck:} Latent space representation of $8 \times 8 \times 512$.
+                \item Decoder: 5 convolutional blocks; each halves the channel depth and doubles the spatial resolution through transposed convolutions.
+                \item Head: $1 \times 1$ convolution mapping channels back to RGB.
+                \item \textbf{No Skip Connections:} Omitted intentionally as they learning the identity function, and reconstruct anomalies.
+            \end{itemize}
+        \item Optimizer: AdamW~\cite{AdamW} with a learning rate of $10^{-3}$.
+        \item Data augmentation: random horizontal and vertical flips.
+        \item Trained for 50 epochs
+    \end{itemize}
+\end{frame}
 
+\begin{frame}{CAE - results}
+    \begin{table}
+        \begin{tabular}{|c|c|c|}
+        \hline
+            & Resize & Sliding window\\
+        \hline
+        MSE & 0.61 & 0.67\\
+        \hline
+        SSIM+MSE & 0.63 & \textbf{0.68}\\
+        \hline
+        \end{tabular}
+        \caption{Models' AUROC scores}
+    \end{table}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.8\textwidth]{imgs/cae_predictions.png}
+    \end{figure}
+    \begin{itemize}
+        \item Performance analysis:
+        \begin{itemize}
+            \item Suboptimal results due to the difficulty of distinguishing between anomalies and misreconstructions.
+            \item \textbf{Low-contrast anomalies} get low anomaly scores.
+            \item \textbf{High variability in normal data} causes reconstruction errors in non-anomalous regions.
+        \end{itemize}
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}{CAE - ablation study}
+    TODO: Inserire tabelle
+
+    \begin{itemize}
+        \item AUROC on MVTec AD~\cite{MVTecAD1} bottles is almost 0.85
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=1\textwidth]{imgs/bottle.png}
+    \end{figure}
 \end{frame}
 
 \begin{frame}{VAE}
