@@ -139,8 +139,21 @@ Gio Formichella}
 
 \begin{frame}{Losses}
     \begin{itemize}
-        \item Mean Square Error (MSE)
-        \item Structural Similarity Index Measure (SSIM)
+        \item \textbf{Mean Squared Error (MSE)} 
+        \begin{equation*}
+            \mathcal{L}_{MSE}(x, \hat{x}) = \frac{1}{N}\sum_{i=1}^{N} (x_i - \hat{x}_i)^2
+        \end{equation*} \begin{itemize}
+            \item Teaches the autoencoder to reconstruct absolute pixel values.
+            \item Tends to average out high-frequency details to minimize the overall loss, resulting in blurry reconstructions.
+        \end{itemize}
+        \item \textbf{Structural Similarity Index Measure (SSIM)} \begin{itemize}
+            \item Evaluates local luminance, contrast, and structure variations within $11 \times 11$ patches.
+            \begin{gather*}
+                SSIM(x, \hat{x}) = \frac{(2\mu_x \mu_{\hat{x}} + c_1)(2 \sigma_{x \hat{x}} + c_2)}{(\mu_x^2 + \mu_{\hat{x}}^2 + c_1)(\sigma_x^2 + \sigma_{\hat{x}}^2 + c_2)}\\
+                \mathcal{L}_{SSIM} = 1 - SSIM
+            \end{gather*}
+            \item Added as a complementary term to the pixel-wise $\mathcal{L}_{\text{MSE}}$ to better preserve fabric textures.
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
