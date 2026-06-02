@@ -137,8 +137,25 @@ Gio Formichella}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Metrics and losses}
+\begin{frame}{Losses}
+    \begin{itemize}
+        \item Mean Square Error (MSE)
+        \item Structural Similarity Index Measure (SSIM)
+    \end{itemize}
+\end{frame}
 
+\begin{frame}{Metrics}
+    \begin{itemize}
+        \item No anomalous validation set is provided for threshold calibration. Models are therefore evaluated using:
+        \item \textbf{Area Under the Receiver Operating Characteristic (AUROC)} \begin{itemize}
+            \item The area under the ROC curve.
+            \item It represents the probability that a randomly chosen anomalous image will have a higher anomaly score than a randomly chosen normal image.
+        \end{itemize}
+        \item \textbf{Precision-Recall Area Under the Curve (PR AUC)}\begin{itemize}
+            \item Also know as Average Precision (AP)
+            \item A 1D summary of the precision-recall curve.
+        \end{itemize}
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{CAE}
@@ -160,16 +177,37 @@ Gio Formichella}
 
 \begin{frame}{CAE - results}
     \begin{table}
-        \begin{tabular}{|c|c|c|}
-        \hline
-            & Resize & Sliding window\\
-        \hline
-        MSE & 0.61 & 0.67\\
-        \hline
-        SSIM+MSE & 0.63 & \textbf{0.68}\\
-        \hline
-        \end{tabular}
-        \caption{Models' AUROC scores}
+        \centering
+        \footnotesize % Makes the text and tables slightly smaller
+        % First Table (Left)
+        \begin{minipage}{0.45\textwidth}
+            \centering
+            \begin{tabular}{|c|c|c|}
+            \hline
+                & Resize & Sliding window\\
+            \hline
+            MSE & 0.61 & 0.67\\
+            \hline
+            SSIM+MSE & 0.63 & \textbf{0.68}\\
+            \hline
+            \end{tabular}
+            \caption{AUROC scores}
+        \end{minipage}
+        \hspace{0.5cm}
+        % Second Table (Right)
+        \begin{minipage}{0.45\textwidth}
+            \centering
+            \begin{tabular}{|c|c|c|}
+            \hline
+                & Resize & Sliding window\\
+            \hline
+            MSE & 0.61 & 0.69\\
+            \hline
+            SSIM+MSE & 0.61 & \textbf{0.71}\\
+            \hline
+            \end{tabular}
+            \caption{PR AUC scores}
+        \end{minipage}
     \end{table}
     \begin{figure}
         \centering
