@@ -7,10 +7,7 @@
 Gio Formichella}
 \date{}
 
-\usepackage{biblatex}
-\addbibresource{refs.bib}
-
-\setbeamertemplate{navigation symbols}{}  % Removes navitation symbols
+\setbeamertemplate{navigation symbols}{}  % Removes navigation symbols
 
 \begin{document}
 
@@ -25,7 +22,7 @@ Gio Formichella}
             \end{itemize}
             \begin{figure}
                 \centering
-                \includegraphics[width=1\linewidth]{imgs/giornale.png}
+                \includegraphics[height=0.43\textheight,keepaspectratio]{imgs/giornale.png}
             \end{figure}
         \end{column}
         \begin{column}{0.5\textwidth}
@@ -41,7 +38,21 @@ Gio Formichella}
     \end{columns}
 \end{frame}
 
-\begin{frame}{Supervised vs Unsupervised Learning}
+\begin{frame}{Industrial inspection constraints}
+    \begin{itemize}
+        \item Fabric inspection is not only a classification problem: the model must support production decisions.
+        \item Practical requirements:
+        \begin{itemize}
+            \item \textbf{Few missed defects}: defective fabric should not reach customers.
+            \item \textbf{Controlled false positives}: normal texture variations should not stop production.
+            \item \textbf{Adaptability}: fabric patterns and lighting conditions change across products and shifts.
+            \item \textbf{Throughput}: full-resolution images are large, so inference cost matters.
+        \end{itemize}
+        \item This motivates a normal-only reconstruction approach, but also makes threshold calibration and localization important.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Why unsupervised learning?}
     \begin{itemize}
         \item The challenge with supervised learning in the textile industry is the \textbf{scarcity} of labeled anomalous data:
         \begin{itemize}
@@ -50,7 +61,7 @@ Gio Formichella}
         \end{itemize}
 
         \vspace{0.3cm}
-        \item Instead, unsupervised techniques like autoencoders exploit the large quantity of flawless fabric images and detect anomalies through the reconstruction error. We tested:
+        \item Instead, unsupervised techniques like autoencoders exploit the large quantity of flawless fabric images and detect anomalies through reconstruction error. We tested:
         \begin{itemize}
             \item \textbf{Convolutional autoencoders (CAE)}
             \item \textbf{Variational autoencoders (VAE)}
@@ -64,7 +75,7 @@ Gio Formichella}
         \item We choose the fabric section of the \textbf{MVTec AD 2}\cite{MVTecAD2}.
         \item Dataset characteristics:
             \begin{itemize}
-                \item Multiple different lighting conditions. Developed models will be robust to real-world distributions shifts due to illumination changes.
+                \item Multiple different lighting conditions. Developed models will be robust to real-world distribution shifts due to illumination changes.
                 \item High variability textures.
                 \item Anomalies distributed across the entire height and width of the images and also directly appear on the image borders.
             \end{itemize}
@@ -83,7 +94,7 @@ Gio Formichella}
 }
 \only<2-3>{
     \begin{itemize}
-        \item Can you spot the anomalies ?
+        \item Can you spot the anomalies?
     \end{itemize}
     \begin{columns}<2-3>
         \begin{column}{0.5\textwidth}
@@ -95,11 +106,35 @@ Gio Formichella}
         \begin{column}{0.5\textwidth}<3>
             \begin{figure}
                 \centering
-                \includegraphics[width=1\linewidth]{imgs/005_overexposed_mask.png}
+                \includegraphics[width=1\linewidth]{imgs/005_overexposed_reveal.png}
             \end{figure}
         \end{column}
     \end{columns}
 }
+\end{frame}
+
+\begin{frame}{Dataset protocol}
+    \begin{itemize}
+        \item We use only the \textbf{public} part of the fabric dataset for evaluation.
+        \item Split sizes:
+        \begin{table}
+            \centering
+            \scriptsize
+            \begin{tabular}{|c|c|c|c|}
+            \hline
+                Split & Normal & Anomalous & Use\\
+            \hline
+                Train & 387 & 0 & Fit reconstruction model\\
+            \hline
+                Validation & 43 & 0 & Select checkpoint\\
+            \hline
+                Test public & 66 & 90 & Report metrics\\
+            \hline
+            \end{tabular}
+        \end{table}
+        \item Consequence: no anomalous validation set is available for choosing an operating threshold.
+        \item We therefore report threshold-free image-level ranking metrics.
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{High resolution challenge}
@@ -138,7 +173,7 @@ Gio Formichella}
 \end{frame}
 
 \begin{frame}{Losses}
-    \begin{itemize}
+    \begin{itemize}\small
         \item \textbf{Mean Squared Error (MSE)} 
         \begin{equation*}
             \mathcal{L}_{MSE}(x, \hat{x}) = \frac{1}{N}\sum_{i=1}^{N} (x_i - \hat{x}_i)^2
@@ -157,76 +192,96 @@ Gio Formichella}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Metrics}
+\begin{frame}{Evaluation}
     \begin{itemize}
-        \item No anomalous validation set is provided for threshold calibration. Models are therefore evaluated using:
+        \item Each image receives one anomaly score.
+        \begin{itemize}
+            \item CAE: mean of the top $1\%$ pixel reconstruction errors.
+            \item VAE: mean of the highest-error patches after patch-position normalization.
+        \end{itemize}
+        \item Models are evaluated using:
         \item \textbf{Area Under the Receiver Operating Characteristic (AUROC)} \begin{itemize}
             \item The area under the ROC curve.
             \item It represents the probability that a randomly chosen anomalous image will have a higher anomaly score than a randomly chosen normal image.
         \end{itemize}
         \item \textbf{Precision-Recall Area Under the Curve (PR AUC)}\begin{itemize}
-            \item Also know as Average Precision (AP)
-            \item A 1D summary of the precision-recall curve.
+            \item Also known as Average Precision (AP)
+            \item Important when anomalous cases are rare and false alarms matter.
         \end{itemize}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{CAE}
+\begin{frame}{What is not evaluated yet}
     \begin{itemize}
-        \item Architecture:
-            \begin{itemize}
-                \item Stem: $3 \times 3$ convolution mapping the input to 16 channels.
-                \item Encoder: 5 convolutional blocks; each doubles the channel depth and halves the spatial resolution.
-                \item \textbf{Bottleneck:} Latent space representation of $8 \times 8 \times 512$.
-                \item Decoder: 5 convolutional blocks; each halves the channel depth and doubles the spatial resolution through transposed convolutions.
-                \item Head: $1 \times 1$ convolution mapping channels back to RGB.
-                \item \textbf{No Skip Connections:} Omitted intentionally as they learning the identity function, and reconstruct anomalies.
-            \end{itemize}
-        \item Optimizer: AdamW~\cite{AdamW} with a learning rate of $10^{-3}$.
-        \item Data augmentation: random horizontal and vertical flips.
-        \item Trained for 50 epochs
+        \item Reported metrics are \textbf{image-level}: they measure whether anomalous images are ranked above normal images.
+        \item They do not directly measure localization quality.
+        \item Missing deployment-facing evaluations:
+        \begin{itemize}
+            \item pixel-level AUROC / AP or PRO score;
+            \item thresholded false positive and false negative rates;
+            \item runtime and memory on the target inspection hardware.
+        \end{itemize}
+        \item We still visualize heatmaps to diagnose whether high scores align with true defects.
     \end{itemize}
 \end{frame}
 
-\begin{frame}{CAE - results}
+\begin{frame}{CAE - architecture}
+    \begin{itemize}
+        \item Stem: $3 \times 3$ convolution mapping the input to 16 channels.
+        \item Encoder: 5 convolutional blocks; each doubles the channel depth and halves the spatial resolution.
+        \item \textbf{Bottleneck:} latent representation of $8 \times 8 \times 512$.
+        \item Decoder: 5 convolutional blocks; each halves the channel depth and doubles the spatial resolution through transposed convolutions.
+        \item Head: $1 \times 1$ convolution mapping channels back to RGB.
+        \item \textbf{No skip connections}: omitted intentionally because skip connections can learn the identity mapping and reconstruct anomalies.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{CAE - training and scoring}
+    \begin{itemize}
+        \item Optimizer: AdamW~\cite{AdamW} with a learning rate of $10^{-3}$.
+        \item Data augmentation: random horizontal and vertical flips.
+        \item Trained for 50 epochs.
+        \item Two inference modes:
+        \begin{itemize}
+            \item \textbf{Resize}: one $256 \times 256$ forward pass per image.
+            \item \textbf{Sliding window}: $256 \times 256$ windows with stride 128 and averaged overlaps.
+        \end{itemize}
+        \item Image score: mean of the top $1\%$ pixel-wise MSE values.
+        \item Losses tested: MSE and SSIM+MSE.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{CAE - image-level results}
     \begin{table}
         \centering
-        \footnotesize % Makes the text and tables slightly smaller
-        % First Table (Left)
-        \begin{minipage}{0.45\textwidth}
-            \centering
-            \begin{tabular}{|c|c|c|}
-            \hline
-                & Resize & Sliding window\\
-            \hline
-            MSE & 0.61 & 0.67\\
-            \hline
-            SSIM+MSE & 0.63 & \textbf{0.68}\\
-            \hline
-            \end{tabular}
-            \caption{AUROC scores}
-        \end{minipage}
-        \hspace{0.5cm}
-        % Second Table (Right)
-        \begin{minipage}{0.45\textwidth}
-            \centering
-            \begin{tabular}{|c|c|c|}
-            \hline
-                & Resize & Sliding window\\
-            \hline
-            MSE & 0.61 & 0.69\\
-            \hline
-            SSIM+MSE & 0.61 & \textbf{0.71}\\
-            \hline
-            \end{tabular}
-            \caption{PR AUC scores}
-        \end{minipage}
+        \footnotesize
+        \begin{tabular}{|c|c|c|c|}
+        \hline
+            Loss & Inference & AUROC & PR AUC\\
+        \hline
+            MSE & Resize & 0.61 & 0.61\\
+        \hline
+            SSIM+MSE & Resize & 0.63 & 0.61\\
+        \hline
+            MSE & Sliding window & 0.67 & 0.69\\
+        \hline
+            SSIM+MSE & Sliding window & \textbf{0.68} & \textbf{0.71}\\
+        \hline
+        \end{tabular}
+        \caption{Held-out image-level scores on fabric test public}
     \end{table}
+    \begin{itemize}
+        \item Sliding windows preserve more local detail than resizing, but still produce only moderate ranking quality.
+        \item SSIM helps slightly, but does not solve the core texture-variability problem.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{CAE - qualitative diagnosis}
     \begin{figure}
         \centering
-        \includegraphics[width=0.8\textwidth]{imgs/cae_predictions.png}
+        \includegraphics[width=0.92\textwidth]{imgs/cae_predictions.png}
     \end{figure}
-    \begin{itemize}
+    \begin{itemize}\footnotesize
         \item Performance analysis:
         \begin{itemize}
             \item Suboptimal results due to the difficulty of distinguishing between anomalies and misreconstructions.
@@ -237,28 +292,240 @@ Gio Formichella}
 
 \end{frame}
 
-\begin{frame}{CAE - ablation study}
-    TODO: Inserire tabelle
-
+\begin{frame}{CAE - sanity check}
     \begin{itemize}
-        \item AUROC on MVTec AD~\cite{MVTecAD1} bottles is almost 0.85
+        \item The same reconstruction idea performs better on a simpler object category.
+        \item AUROC on MVTec AD~\cite{MVTecAD1} bottles is almost 0.85.
+        \item Interpretation: the method is not intrinsically broken; printed fabric is harder because normal texture variation can look like reconstruction error.
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=1\textwidth]{imgs/bottle.png}
+        \includegraphics[width=0.9\textwidth]{imgs/bottle.png}
     \end{figure}
 \end{frame}
 
-\begin{frame}{VAE}
-    
+\begin{frame}{From CAE to patch-feature VAE}
+    \begin{itemize}
+        \item CAE reconstructs RGB pixels directly.
+        \begin{itemize}
+            \item This makes harmless texture and illumination changes look anomalous.
+            \item It also blurs high-frequency details that can contain small defects.
+        \end{itemize}
+        \item We switch to a lower-dimensional local representation:
+        \begin{itemize}
+            \item model $8 \times 8$ texture patches instead of whole images;
+            \item reconstruct normalized gray intensity, gradients, and low-frequency FFT features;
+            \item aggregate only the worst local errors into an image score.
+        \end{itemize}
+        \item Goal: improve image-level ranking while keeping computation memory efficient.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - patch features}
+    \begin{columns}
+        \begin{column}{0.52\textwidth}
+            \begin{itemize}
+                \item Images are center-cropped, resized to $256 \times 256$, and split into $8 \times 8$ patches.
+                \item Each image produces a $32 \times 32$ patch grid.
+                \item Each patch feature vector contains:
+                \begin{itemize}
+                    \item normalized gray-level intensities;
+                    \item horizontal and vertical gradients;
+                    \item low-frequency FFT magnitudes.
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{table}
+                \centering
+                \footnotesize
+                \begin{tabular}{|c|c|}
+                \hline
+                    Component & Dimension\\
+                \hline
+                    Gray & 64\\
+                \hline
+                    dx + dy & 112\\
+                \hline
+                    FFT & 16\\
+                \hline
+                    Total & 192\\
+                \hline
+                \end{tabular}
+            \end{table}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{VAE - model and scoring}
+    \begin{itemize}
+        \item Architecture:
+            \begin{itemize}
+                \item Encoder: fully connected layers with LayerNorm and GELU activations.
+                \item \textbf{Latent space:} Gaussian latent variables with $\mu, \log \sigma^2 \in \mathbb{R}^{32}$.
+                \item Decoder: symmetric MLP reconstructing the original patch feature vector.
+            \end{itemize}
+        \item Training objective:
+        \begin{equation*}
+            \mathcal{L}_{VAE} = \mathcal{L}_{MSE}(f, \hat{f}) + \beta D_{KL}\left(q(z|f)\|p(z)\right), \quad \beta = 10^{-3}
+        \end{equation*}
+        \item Denoising noise $\sigma=0.05$ is added during training.
+        \item Anomaly score: average of the top $0.2\%$ patch errors, normalized by the expected error at each patch position.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - results}
+    \begin{table}
+        \centering
+        \footnotesize
+        \begin{tabular}{|c|c|c|}
+        \hline
+            Model & AUROC & PR AUC\\
+        \hline
+            Feature VAE & \textbf{0.80} & \textbf{0.80}\\
+        \hline
+            High-res Feature VAE & 0.79 & 0.76\\
+        \hline
+            Best CAE & 0.68 & 0.71\\
+        \hline
+        \end{tabular}
+        \caption{Held-out image-level scores}
+    \end{table}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.70\textwidth]{imgs/vae_results_aligned.png}
+    \end{figure}
+    \begin{itemize}\footnotesize
+        \item Best setting: latent dimension 32, $\beta=10^{-3}$, denoising noise $\sigma=0.05$.
+        \item Patch-feature modeling improves image-level ranking over the CAE baseline.
+        \item Red outline: ground-truth defect on the VAE error overlay.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - diagnostics}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.60\textheight]{imgs/vae_reconstruction_comparison.png}
+    \end{figure}
+    \begin{itemize}\footnotesize
+        \item The VAE improves image-level ranking over the CAE, but localization remains noisy.
+        \item Rare normal texture variations can receive high scores, creating false-positive patches.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - ablation study}
+    \begin{table}
+        \centering
+        \footnotesize
+        \begin{tabular}{|c|c|c|}
+        \hline
+            Features & Best AUROC & Best PR AUC\\
+        \hline
+            Gray + dx/dy + FFT & \textbf{0.80} & \textbf{0.80}\\
+        \hline
+            dx/dy + FFT & 0.79 & 0.79\\
+        \hline
+            Gray + dx/dy & 0.76 & 0.74\\
+        \hline
+            Gray only & 0.68 & 0.66\\
+        \hline
+        \end{tabular}
+        \caption{Feature ablation on held-out image-level scores}
+    \end{table}
+    \begin{itemize}
+        \item Removing gray intensities only drops AUROC from $0.80$ to $0.79$.
+        \item FFT and gradient features carry most of the discriminative signal.
+        \item Gray intensities still help slightly, probably by preserving local brightness and print-density changes.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - feature reconstruction}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.96\textwidth]{imgs/vae_feature_reconstructions_patches_1.png}
+    \end{figure}
+    \begin{itemize}\footnotesize
+        \item Green boxes mark the top $0.2\%$ highest-error patches used for image scoring.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{VAE - feature reconstruction}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.96\textwidth,trim=0 12 0 58,clip]{imgs/vae_feature_reconstructions_patches_2.png}
+    \end{figure}
+    \begin{itemize}\footnotesize
+        \item Error maps are computed on patch features, not on reconstructed RGB pixels.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Thresholding and deployment gap}
+    \begin{itemize}
+        \item AUROC and PR AUC measure ranking, not a deployed decision rule.
+        \item In production, a threshold is still required:
+        \begin{itemize}
+            \item too low: many normal texture changes trigger alarms;
+            \item too high: small low-contrast defects are missed.
+        \end{itemize}
+        \item Because validation contains only normal images, threshold calibration would require either:
+        \begin{itemize}
+            \item a small labeled anomalous validation set;
+            \item a target false-positive rate on normal validation images;
+            \item human review of uncertain high-score cases during deployment.
+        \end{itemize}
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{Conclusion}
-    
+    \begin{itemize}
+        \item Reconstruction-based anomaly detection is viable for fabric inspection, but the dataset is challenging:
+        \begin{itemize}
+            \item defects are often tiny and low-contrast;
+            \item normal fabrics have large texture and illumination variability;
+            \item no anomalous validation set is available for threshold calibration.
+        \end{itemize}
+        \item \textbf{CAE}: simple end-to-end image reconstruction, but fabric texture variability creates false reconstruction errors.
+        \item \textbf{VAE}: patch-feature modeling improves image-level ranking to $0.80$ AUROC / $0.80$ PR AUC.
+        \item Main limitation: localization and threshold selection are not yet deployment-ready.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Next steps}
+    \begin{itemize}
+        \item Future work:
+        \begin{itemize}
+            \item calibrate thresholds with a small labeled anomalous validation subset;
+            \item report pixel-level localization metrics;
+            \item combine reconstruction error with pretrained visual features;
+            \item evaluate larger context windows to reduce false positives from normal texture changes.
+        \end{itemize}
+        \item The immediate blocker is not training another reconstruction model, but turning good image ranking into reliable inspection decisions.
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{References}
-    \printbibliography
+    \footnotesize
+    \begin{thebibliography}{9}
+        \bibitem{MVTecAD2}
+        Heckler-Kram et al.
+        \newblock The MVTec AD 2 Dataset: Advanced Scenarios for Unsupervised Anomaly Detection.
+        \newblock \emph{International Journal of Computer Vision}, 2026.
+
+        \bibitem{MVTecAD1}
+        Bergmann et al.
+        \newblock MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection.
+        \newblock \emph{CVPR}, 2019.
+
+        \bibitem{ZFNet}
+        Zeiler and Fergus.
+        \newblock Visualizing and Understanding Convolutional Networks.
+        \newblock arXiv:1311.2901, 2013.
+
+        \bibitem{AdamW}
+        Loshchilov and Hutter.
+        \newblock Decoupled Weight Decay Regularization.
+        \newblock arXiv:1711.05101, 2019.
+    \end{thebibliography}
 \end{frame}
 
 \end{document}
