@@ -48,7 +48,7 @@ Gio Formichella}
             \item \textbf{Adaptability}: fabric patterns and lighting conditions change across products and shifts.
             \item \textbf{Throughput}: full-resolution images are large, so inference cost matters.
         \end{itemize}
-        \item This motivates a normal-only reconstruction approach, but also makes threshold calibration and localization important.
+        \item This motivates a normal-only reconstruction approach, but also makes threshold calibration important.
     \end{itemize}
 \end{frame}
 
@@ -106,7 +106,7 @@ Gio Formichella}
         \begin{column}{0.5\textwidth}<3>
             \begin{figure}
                 \centering
-                \includegraphics[width=1\linewidth]{imgs/005_overexposed_reveal.png}
+                \includegraphics[width=1\linewidth]{imgs/005_overexposed_mask.png}
             \end{figure}
         \end{column}
     \end{columns}
@@ -128,7 +128,7 @@ Gio Formichella}
             \hline
                 Validation & 43 & 0 & Select checkpoint\\
             \hline
-                Test public & 66 & 90 & Report metrics\\
+                Test public & 66 & 90 & Model evaluation\\
             \hline
             \end{tabular}
         \end{table}
@@ -182,7 +182,7 @@ Gio Formichella}
             \item Tends to average out high-frequency details to minimize the overall loss, resulting in blurry reconstructions.
         \end{itemize}
         \item \textbf{Structural Similarity Index Measure (SSIM)} \begin{itemize}
-            \item Evaluates local luminance, contrast, and structure variations within $11 \times 11$ patches.
+            \item Evaluates local luminance, contrast, and structure variations.
             \begin{gather*}
                 SSIM(x, \hat{x}) = \frac{(2\mu_x \mu_{\hat{x}} + c_1)(2 \sigma_{x \hat{x}} + c_2)}{(\mu_x^2 + \mu_{\hat{x}}^2 + c_1)(\sigma_x^2 + \sigma_{\hat{x}}^2 + c_2)}\\
                 \mathcal{L}_{SSIM} = 1 - SSIM
@@ -197,7 +197,7 @@ Gio Formichella}
         \item Each image receives one anomaly score.
         \begin{itemize}
             \item CAE: mean of the top $1\%$ pixel reconstruction errors.
-            \item VAE: mean of the highest-error patches after patch-position normalization.
+            \item VAE: mean of the top $0.2\%$ highest-error patches after patch-position normalization.
         \end{itemize}
         \item Models are evaluated using:
         \item \textbf{Area Under the Receiver Operating Characteristic (AUROC)} \begin{itemize}
@@ -208,20 +208,6 @@ Gio Formichella}
             \item Also known as Average Precision (AP)
             \item Important when anomalous cases are rare and false alarms matter.
         \end{itemize}
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{What is not evaluated yet}
-    \begin{itemize}
-        \item Reported metrics are \textbf{image-level}: they measure whether anomalous images are ranked above normal images.
-        \item They do not directly measure localization quality.
-        \item Missing deployment-facing evaluations:
-        \begin{itemize}
-            \item pixel-level AUROC / AP or PRO score;
-            \item thresholded false positive and false negative rates;
-            \item runtime and memory on the target inspection hardware.
-        \end{itemize}
-        \item We still visualize heatmaps to diagnose whether high scores align with true defects.
     \end{itemize}
 \end{frame}
 
@@ -251,7 +237,7 @@ Gio Formichella}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{CAE - image-level results}
+\begin{frame}{CAE - results}
     \begin{table}
         \centering
         \footnotesize
@@ -296,7 +282,6 @@ Gio Formichella}
     \begin{itemize}
         \item The same reconstruction idea performs better on a simpler object category.
         \item AUROC on MVTec AD~\cite{MVTecAD1} bottles is almost 0.85.
-        \item Interpretation: the method is not intrinsically broken; printed fabric is harder because normal texture variation can look like reconstruction error.
     \end{itemize}
     \begin{figure}
         \centering
@@ -304,24 +289,19 @@ Gio Formichella}
     \end{figure}
 \end{frame}
 
-\begin{frame}{From CAE to patch-feature VAE}
+\begin{frame}{VAE - architecture}
     \begin{itemize}
-        \item CAE reconstructs RGB pixels directly.
+        \item Input: one local feature vector at a time.
+        \item Encoder: fully connected layers with LayerNorm and GELU activations.
         \begin{itemize}
-            \item This makes harmless texture and illumination changes look anomalous.
-            \item It also blurs high-frequency details that can contain small defects.
+            \item maps the input to $\mu, \log \sigma^2 \in \mathbb{R}^{32}$
         \end{itemize}
-        \item We switch to a lower-dimensional local representation:
-        \begin{itemize}
-            \item model $8 \times 8$ texture patches instead of whole images;
-            \item reconstruct normalized gray intensity, gradients, and low-frequency FFT features;
-            \item aggregate only the worst local errors into an image score.
-        \end{itemize}
-        \item Goal: improve image-level ranking while keeping computation memory efficient.
+        \item Latent sample: $z = \mu + \sigma \epsilon$, with $\epsilon \sim \mathcal{N}(0, I)$.
+        \item Decoder: symmetric MLP reconstructing the original feature vector.
     \end{itemize}
 \end{frame}
 
-\begin{frame}{VAE - patch features}
+\begin{frame}{VAE - input features}
     \begin{columns}
         \begin{column}{0.52\textwidth}
             \begin{itemize}
@@ -357,14 +337,8 @@ Gio Formichella}
     \end{columns}
 \end{frame}
 
-\begin{frame}{VAE - model and scoring}
+\begin{frame}{VAE - training and scoring}
     \begin{itemize}
-        \item Architecture:
-            \begin{itemize}
-                \item Encoder: fully connected layers with LayerNorm and GELU activations.
-                \item \textbf{Latent space:} Gaussian latent variables with $\mu, \log \sigma^2 \in \mathbb{R}^{32}$.
-                \item Decoder: symmetric MLP reconstructing the original patch feature vector.
-            \end{itemize}
         \item Training objective:
         \begin{equation*}
             \mathcal{L}_{VAE} = \mathcal{L}_{MSE}(f, \hat{f}) + \beta D_{KL}\left(q(z|f)\|p(z)\right), \quad \beta = 10^{-3}
@@ -484,22 +458,7 @@ Gio Formichella}
             \item normal fabrics have large texture and illumination variability;
             \item no anomalous validation set is available for threshold calibration.
         \end{itemize}
-        \item \textbf{CAE}: simple end-to-end image reconstruction, but fabric texture variability creates false reconstruction errors.
-        \item \textbf{VAE}: patch-feature modeling improves image-level ranking to $0.80$ AUROC / $0.80$ PR AUC.
-        \item Main limitation: localization and threshold selection are not yet deployment-ready.
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{Next steps}
-    \begin{itemize}
-        \item Future work:
-        \begin{itemize}
-            \item calibrate thresholds with a small labeled anomalous validation subset;
-            \item report pixel-level localization metrics;
-            \item combine reconstruction error with pretrained visual features;
-            \item evaluate larger context windows to reduce false positives from normal texture changes.
-        \end{itemize}
-        \item The immediate blocker is not training another reconstruction model, but turning good image ranking into reliable inspection decisions.
+        \item Textile anomaly detection remains an important and open problem for the Prato textile industry.
     \end{itemize}
 \end{frame}
 
