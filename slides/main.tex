@@ -172,38 +172,28 @@ Gio Formichella}
         \end{itemize}
         \item \textbf{Precision-Recall Area Under the Curve (PR AUC)}\begin{itemize}
             \item Also known as Average Precision (AP)
-            \item Area under the precision-recall curve.
         \end{itemize}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{CAE - architecture}
+\begin{frame}{CAE}
     \begin{itemize}
-        \item Stem: $3 \times 3$ convolution mapping the input to 16 channels.
-        \item Encoder: 5 convolutional blocks; each doubles the channel depth and halves the spatial resolution.
-        \item \textbf{Bottleneck:} latent representation of $8 \times 8 \times 512$.
-        \item Decoder: 5 convolutional blocks; each halves the channel depth and doubles the spatial resolution through transposed convolutions.
-        \item Head: $1 \times 1$ convolution mapping channels back to RGB.
-        \item \textbf{No skip connections}: omitted intentionally because skip connections can learn the identity mapping and reconstruct anomalies.
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{CAE - training and scoring}
-    \begin{itemize}
+        \item Architecture:
+            \begin{itemize}
+                \item Stem: $3 \times 3$ convolution mapping the input to 16 channels.
+                \item Encoder: 5 convolutional blocks; each doubles the channel depth and halves the spatial resolution.
+                \item \textbf{Bottleneck:} Latent space representation of $8 \times 8 \times 512$.
+                \item Decoder: 5 convolutional blocks; each halves the channel depth and doubles the spatial resolution through transposed convolutions.
+                \item Head: $1 \times 1$ convolution mapping channels back to RGB.
+                \item \textbf{No Skip Connections:} Omitted intentionally as they learning the identity function, and reconstruct anomalies.
+            \end{itemize}
         \item Optimizer: AdamW~\cite{AdamW} with a learning rate of $10^{-3}$.
         \item Data augmentation: random horizontal and vertical flips.
-        \item Trained for 50 epochs.
-        \item Two inference modes:
-        \begin{itemize}
-            \item \textbf{Resize}: one $256 \times 256$ forward pass per image.
-            \item \textbf{Sliding window}: $256 \times 256$ windows with stride 128 and averaged overlaps.
-        \end{itemize}
-        \item Image score: mean of the top $1\%$ pixel-wise MSE values.
-        \item Losses tested: MSE and SSIM+MSE.
+        \item Trained for 50 epochs
     \end{itemize}
 \end{frame}
 
-\begin{frame}{CAE - results}
+\begin{frame}{CAE - quantitative results}
     \begin{table}
         \centering
         \footnotesize
@@ -220,22 +210,11 @@ Gio Formichella}
             SSIM+MSE & Sliding window & \textbf{0.68} & \textbf{0.71}\\
         \hline
         \end{tabular}
-        \caption{Held-out image-level scores on fabric test public}
+        \caption{Test set scores}
     \end{table}
     \begin{itemize}
         \item Sliding windows preserve more local detail than resizing, but still produce only moderate ranking quality.
-        \item SSIM helps slightly, but does not solve the core texture-variability problem.
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{CAE - bottleneck capacity}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.86\textwidth]{imgs/cae_bottleneck_auroc.png}
-    \end{figure}
-    \begin{itemize}\footnotesize
-        \item The selected $8 \times 8 \times 512$ bottleneck gives the best ranking.
-        \item Severe spatial compression loses useful texture structure.
+        \item SSIM brings slight improvements.
     \end{itemize}
 \end{frame}
 
@@ -252,12 +231,18 @@ Gio Formichella}
             \item \textbf{High variability in normal data} causes reconstruction errors in non-anomalous regions.
         \end{itemize}
     \end{itemize}
+\end{frame}
 
+\begin{frame}{CAE - ablation}
+    \begin{figure}
+        \centering
+        \includegraphics[width=1\textwidth]{imgs/cae_bottleneck_auroc.png}
+    \end{figure}
 \end{frame}
 
 \begin{frame}{CAE - sanity check}
     \begin{itemize}
-        \item The same reconstruction idea performs better on a simpler object category.
+        \item The same reconstruction pipeline performs better on a simpler object categories.
         \item AUROC on MVTec AD~\cite{MVTecAD1} bottles is almost 0.85.
     \end{itemize}
     \begin{figure}
