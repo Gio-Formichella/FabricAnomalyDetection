@@ -2,6 +2,9 @@
 \usepackage{graphicx} % Required for inserting images
 \usetheme{Madrid}
 
+\usepackage{biblatex}
+\addbibresource{refs.bib}
+
 \title{Fabric Anomaly Detection}
 \author{Jacopo Dardini \\ 
 Gio Formichella}
@@ -99,27 +102,24 @@ Gio Formichella}
 }
 \end{frame}
 
-\begin{frame}{Dataset protocol}
+\begin{frame}{Dataset}
     \begin{itemize}
-        \item We use only the \textbf{public} part of the fabric dataset for evaluation.
         \item Split sizes:
         \begin{table}
             \centering
-            \scriptsize
-            \begin{tabular}{|c|c|c|c|}
+            \begin{tabular}{|c|c|c|}
             \hline
-                Split & Normal & Anomalous & Use\\
+                Split & Normal & Anomalous\\
             \hline
-                Train & 387 & 0 & Fit reconstruction model\\
+                Train & 387 & 0\\
             \hline
-                Validation & 43 & 0 & Select checkpoint\\
+                Validation & 43 & 0\\
             \hline
-                Test public & 66 & 90 & Model evaluation\\
+                Test public & 66 & 90\\
             \hline
             \end{tabular}
         \end{table}
-        \item Consequence: no anomalous validation set is available for choosing an operating threshold.
-        \item We therefore report threshold-free image-level ranking metrics.
+        \item No anomalous validation set is available for choosing an operating threshold. We therefore report threshold-independent image-level metrics.
     \end{itemize}
 \end{frame}
 
@@ -437,28 +437,7 @@ Gio Formichella}
 \end{frame}
 
 \begin{frame}{References}
-    \footnotesize
-    \begin{thebibliography}{9}
-        \bibitem{MVTecAD2}
-        Heckler-Kram et al.
-        \newblock The MVTec AD 2 Dataset: Advanced Scenarios for Unsupervised Anomaly Detection.
-        \newblock \emph{International Journal of Computer Vision}, 2026.
-
-        \bibitem{MVTecAD1}
-        Bergmann et al.
-        \newblock MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection.
-        \newblock \emph{CVPR}, 2019.
-
-        \bibitem{ZFNet}
-        Zeiler and Fergus.
-        \newblock Visualizing and Understanding Convolutional Networks.
-        \newblock arXiv:1311.2901, 2013.
-
-        \bibitem{AdamW}
-        Loshchilov and Hutter.
-        \newblock Decoupled Weight Decay Regularization.
-        \newblock arXiv:1711.05101, 2019.
-    \end{thebibliography}
+    \printbibliography
 \end{frame}
 
 \end{document}
