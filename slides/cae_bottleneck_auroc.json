@@ -4,7 +4,7 @@
         {
             "bottleneck_shape": "8x8x16",
             "latent_activations": 1024,
-            "auroc": 0.60,
+            "auroc": 0.6012312451513421,
             "pr_auc": 0.6511318703407778,
             "source": "adjusted from results/cae_fair_latent_8x8x16_seed42/metrics.json"
         },
@@ -39,8 +39,8 @@
         {
             "bottleneck_shape": "8x8x512",
             "latent_activations": 32768,
-            "auroc": 0.68,
-            "pr_auc": 0.71,
+            "auroc": 0.6756133154126499,
+            "pr_auc": 0.7130887612354861,
             "source": "final CAE sliding-window table result"
         }
     ],
