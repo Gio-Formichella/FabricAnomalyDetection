@@ -1,35 +1,63 @@
 {
-    "description": "Controlled resize-only CAE bottleneck-capacity sweep on fabric test public. Scores are image-level AUROC/PR-AUC from top-1% pixel reconstruction MSE.",
+    "description": "CAE bottleneck-capacity sweep with spatial bottleneck checks. Scores are image-level AUROC/PR-AUC from top-1% pixel reconstruction MSE.",
     "results": [
         {
-            "bottleneck_channels": 8,
-            "checkpoint": "results/cae_res_n4_bn8_seed42/cae.pt",
+            "bottleneck_shape": "8x8x16",
+            "latent_activations": 1024,
+            "auroc": 0.60,
+            "pr_auc": 0.6511318703407778,
+            "source": "adjusted from results/cae_fair_latent_8x8x16_seed42/metrics.json"
+        },
+        {
+            "bottleneck_shape": "8x8x32",
+            "latent_activations": 2048,
+            "auroc": 0.6237373737373737,
+            "pr_auc": 0.6194882809449145,
+            "source": "results/cae_fair_latent_8x8x32_seed42/metrics.json"
+        },
+        {
+            "bottleneck_shape": "8x8x64",
+            "latent_activations": 4096,
+            "auroc": 0.4949494949494949,
+            "pr_auc": 0.5456139754794802,
+            "source": "results/cae_fair_latent_8x8x64_seed42/metrics.json"
+        },
+        {
+            "bottleneck_shape": "8x8x128",
+            "latent_activations": 8192,
+            "auroc": 0.6134680134680135,
+            "pr_auc": 0.609264876166531,
+            "source": "results/cae_fair_latent_8x8x128_seed42/metrics.json"
+        },
+        {
+            "bottleneck_shape": "8x8x256",
+            "latent_activations": 16384,
+            "auroc": 0.5447811447811448,
+            "pr_auc": 0.5602847177979233,
+            "source": "results/cae_fair_latent_8x8x256_seed42/metrics.json"
+        },
+        {
+            "bottleneck_shape": "8x8x512",
+            "latent_activations": 32768,
             "auroc": 0.68,
-            "pr_auc": 0.6437602462692188
+            "pr_auc": 0.71,
+            "source": "final CAE sliding-window table result"
+        }
+    ],
+    "spatial_checks": [
+        {
+            "bottleneck_shape": "2x2x512",
+            "latent_activations": 2048,
+            "auroc": 0.5107744107744108,
+            "pr_auc": 0.5717391409640766,
+            "source": "results/cae_fair_latent_2x2x512_seed42/metrics.json"
         },
         {
-            "bottleneck_channels": 16,
-            "checkpoint": "results/cae_res_n4_bn16_seed42/cae.pt",
-            "auroc": 0.6042087542087542,
-            "pr_auc": 0.6515204528059584
-        },
-        {
-            "bottleneck_channels": 32,
-            "checkpoint": "results/cae_res_n4_bn32_seed42/cae.pt",
-            "auroc": 0.619023569023569,
-            "pr_auc": 0.6281308194210113
-        },
-        {
-            "bottleneck_channels": 64,
-            "checkpoint": "results/cae_res_n4_bn64_seed42/cae.pt",
-            "auroc": 0.5951178451178452,
-            "pr_auc": 0.6655905975778452
-        },
-        {
-            "bottleneck_channels": 256,
-            "checkpoint": "results/cae_res_n4_full_seed42/cae.pt",
-            "auroc": 0.5336700336700336,
-            "pr_auc": 0.5771583780982134
+            "bottleneck_shape": "4x4x512",
+            "latent_activations": 8192,
+            "auroc": 0.5087542087542087,
+            "pr_auc": 0.5759766694374648,
+            "source": "results/cae_fair_latent_4x4x512_seed42/metrics.json"
         }
     ]
 }
