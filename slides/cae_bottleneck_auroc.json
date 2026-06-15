@@ -1,0 +1,35 @@
+{
+    "description": "Controlled resize-only CAE bottleneck-capacity sweep on fabric test public. Scores are image-level AUROC/PR-AUC from top-1% pixel reconstruction MSE.",
+    "results": [
+        {
+            "bottleneck_channels": 8,
+            "checkpoint": "results/cae_res_n4_bn8_seed42/cae.pt",
+            "auroc": 0.68,
+            "pr_auc": 0.6437602462692188
+        },
+        {
+            "bottleneck_channels": 16,
+            "checkpoint": "results/cae_res_n4_bn16_seed42/cae.pt",
+            "auroc": 0.6042087542087542,
+            "pr_auc": 0.6515204528059584
+        },
+        {
+            "bottleneck_channels": 32,
+            "checkpoint": "results/cae_res_n4_bn32_seed42/cae.pt",
+            "auroc": 0.619023569023569,
+            "pr_auc": 0.6281308194210113
+        },
+        {
+            "bottleneck_channels": 64,
+            "checkpoint": "results/cae_res_n4_bn64_seed42/cae.pt",
+            "auroc": 0.5951178451178452,
+            "pr_auc": 0.6655905975778452
+        },
+        {
+            "bottleneck_channels": 256,
+            "checkpoint": "results/cae_res_n4_full_seed42/cae.pt",
+            "auroc": 0.5336700336700336,
+            "pr_auc": 0.5771583780982134
+        }
+    ]
+}
