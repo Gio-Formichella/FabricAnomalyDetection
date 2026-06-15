@@ -38,20 +38,6 @@ Gio Formichella}
     \end{columns}
 \end{frame}
 
-\begin{frame}{Industrial inspection constraints}
-    \begin{itemize}
-        \item Fabric inspection is not only a classification problem: the model must support production decisions.
-        \item Practical requirements:
-        \begin{itemize}
-            \item \textbf{Few missed defects}: defective fabric should not reach customers.
-            \item \textbf{Controlled false positives}: normal texture variations should not stop production.
-            \item \textbf{Adaptability}: fabric patterns and lighting conditions change across products and shifts.
-            \item \textbf{Throughput}: full-resolution images are large, so inference cost matters.
-        \end{itemize}
-        \item This motivates a normal-only reconstruction approach, but also makes threshold calibration important.
-    \end{itemize}
-\end{frame}
-
 \begin{frame}{Why unsupervised learning?}
     \begin{itemize}
         \item The challenge with supervised learning in the textile industry is the \textbf{scarcity} of labeled anomalous data:
