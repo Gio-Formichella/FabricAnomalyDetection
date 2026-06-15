@@ -102,27 +102,6 @@ Gio Formichella}
 }
 \end{frame}
 
-\begin{frame}{Dataset}
-    \begin{itemize}
-        \item Split sizes:
-        \begin{table}
-            \centering
-            \begin{tabular}{|c|c|c|}
-            \hline
-                Split & Normal & Anomalous\\
-            \hline
-                Train & 387 & 0\\
-            \hline
-                Validation & 43 & 0\\
-            \hline
-                Test public & 66 & 90\\
-            \hline
-            \end{tabular}
-        \end{table}
-        \item No anomalous validation set is available for choosing an operating threshold. We therefore report threshold-independent image-level metrics.
-    \end{itemize}
-\end{frame}
-
 \begin{frame}{High resolution challenge}
     \begin{itemize}
         \item Images have a high resolution ($2448 \times 2048$), causing VRAM usage to exceed our GPU limits. Aggressive striding would result in dead filters~\cite{ZFNet}, so we tried two different approaches: \begin{enumerate}
@@ -143,7 +122,7 @@ Gio Formichella}
                     \centering
                     \includegraphics[width=0.3\textwidth]{imgs/checkerboard.png}
                 \end{figure}
-                \item Pixels at the borders of the window are not reconstructed correctly, increasing the anomaly score and the false positive rate. 
+                \item Pixels at the borders of the window are not reconstructed correctly, increasing their anomaly scores. 
             \end{itemize}
             }
             \only<3>{
@@ -180,19 +159,20 @@ Gio Formichella}
 
 \begin{frame}{Evaluation}
     \begin{itemize}
-        \item Each image receives one anomaly score.
+        \item Each image receives one aggregated anomaly score.
         \begin{itemize}
             \item CAE: mean of the top $1\%$ pixel reconstruction errors.
             \item VAE: mean of the top $0.2\%$ highest-error patches after patch-position normalization.
         \end{itemize}
-        \item Models are evaluated using:
+        \vspace{0.15cm}
+        \item The validation set contains no anomalous data for threshold calibration. The models are therefore evaluated using:
         \item \textbf{Area Under the Receiver Operating Characteristic (AUROC)} \begin{itemize}
             \item The area under the ROC curve.
             \item It represents the probability that a randomly chosen anomalous image will have a higher anomaly score than a randomly chosen normal image.
         \end{itemize}
         \item \textbf{Precision-Recall Area Under the Curve (PR AUC)}\begin{itemize}
             \item Also known as Average Precision (AP)
-            \item Important when anomalous cases are rare and false alarms matter.
+            \item Area under the precision-recall curve.
         \end{itemize}
     \end{itemize}
 \end{frame}
