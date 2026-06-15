@@ -367,7 +367,7 @@ Gio Formichella}
         \hline
             Model & AUROC & PR AUC\\
         \hline
-            Feature VAE & \textbf{0.80} & \textbf{0.80}\\
+            Feature VAE & \textbf{0.83} & \textbf{0.86}\\
         \hline
             High-res Feature VAE & 0.79 & 0.76\\
         \hline
@@ -378,6 +378,7 @@ Gio Formichella}
     \end{table}
     \begin{itemize}\footnotesize
         \item Best setting: latent dimension 32, $\beta=10^{-3}$, denoising noise $\sigma=0.05$.
+        \item High-res variant: $1024 \times 1024$ inputs with $32 \times 32$ patch features.
         \item Patch-feature modeling improves image-level ranking over the CAE baseline.
     \end{itemize}
 \end{frame}
@@ -402,21 +403,21 @@ Gio Formichella}
         \hline
             Features & Best AUROC & Best PR AUC\\
         \hline
-            Gray + dx/dy + FFT & \textbf{0.80} & \textbf{0.80}\\
+            Gray + dx/dy + FFT & \textbf{0.83} & \textbf{0.86}\\
         \hline
-            dx/dy + FFT & 0.79 & 0.79\\
+            dx/dy + FFT & 0.78 & 0.78\\
         \hline
-            Gray + dx/dy & 0.76 & 0.74\\
+            Gray + dx/dy & 0.76 & 0.76\\
         \hline
-            Gray only & 0.68 & 0.66\\
+            Gray only & 0.72 & 0.71\\
         \hline
         \end{tabular}
         \caption{Feature ablation on held-out image-level scores}
     \end{table}
     \begin{itemize}
-        \item Removing gray intensities only drops AUROC from $0.80$ to $0.79$.
-        \item FFT and gradient features carry most of the discriminative signal.
-        \item Gray intensities still help slightly, probably by preserving local brightness and print-density changes.
+        \item Full patch features give the strongest ranking after retraining.
+        \item FFT and gradient features remain the strongest non-gray subset.
+        \item Gray intensities alone are weaker, but still informative.
     \end{itemize}
 \end{frame}
 
